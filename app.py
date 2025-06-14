@@ -124,18 +124,10 @@ def create_plot(actual, predicted, title):
 
 # --- STREAMLIT INTERFACE ---
 
-# PERBAIKAN: Menambahkan CSS kustom untuk tema terang (sidebar putih, latar belakang abu-abu)
+# CSS kustom untuk memberi bingkai pada gambar meme
 st.markdown(
     """
     <style>
-    /* Mengatur warna latar belakang utama aplikasi */
-    .main {
-        background-color: #f8f9fa;
-    }
-    /* Mengatur warna latar belakang sidebar menjadi putih */
-    [data-testid="stSidebar"] {
-        background-color: white;
-    }
     /* Menjaga style untuk gambar meme agar memiliki bingkai putihnya sendiri */
     [data-testid="stSidebar"] [data-testid="stImage"] > img {
         background-color: #ffffff;
@@ -164,17 +156,16 @@ if 'results' not in st.session_state:
 
 # File Upload Section in the Sidebar
 with st.sidebar:
-    st.header("Unggah Data Saham")
-    
     try:
         # Membuat path yang benar ke gambar, agar berfungsi baik di lokal maupun saat deploy
         base_path = os.path.dirname(__file__)
         image_path = os.path.join(base_path, 'static', 'meme-stonks.jpg')
-        # PERUBAHAN: Menggunakan use_column_width untuk mengisi lebar sidebar
         st.image(image_path, use_column_width='auto')
     except FileNotFoundError:
         st.warning("File 'meme-stonks.jpg' tidak ditemukan. Pastikan file tersebut ada di dalam folder 'static'.")
-
+    
+    # PERBAIKAN: Menambahkan kembali header "Unggah Data Saham"
+    st.header("Unggah Data Saham")
     daily_file = st.file_uploader("Data Harian (.csv)", type="csv")
     weekly_file = st.file_uploader("Data Mingguan (.csv)", type="csv")
     monthly_file = st.file_uploader("Data Bulanan (.csv)", type="csv")
