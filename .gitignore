@@ -1,0 +1,12 @@
+# Virtual Environment
+venv/
+__pycache__/
+
+# Model file yang besar
+models/
+*.keras
+*.h5
+
+# File sistem operasi
+.DS_Store
+Thumbs.db

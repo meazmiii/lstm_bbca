@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hasil Analisis LSTM - BBCA</title>
+    
+    <!-- Impor Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Impor Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* Menggunakan font Inter sebagai default */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa; /* bg-gray-50 */
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <!-- Header Halaman -->
+        <header class="text-center mb-12">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800">Hasil Analisis Model LSTM</h1>
+            <p class="text-gray-600 mt-2 text-lg">Evaluasi performa model pada tiga timeframe berbeda.</p>
+        </header>
+
+        <!-- Kartu Timeframe Terbaik -->
+        <div class="max-w-3xl mx-auto bg-green-100 border-l-4 border-green-500 text-green-800 p-6 rounded-lg shadow-lg mb-12">
+            <div class="flex items-center">
+                <svg class="w-12 h-12 mr-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                    <p class="font-semibold text-lg">Timeframe Prediksi Terbaik:</p>
+                    <p class="text-3xl font-bold">{{ best_timeframe|capitalize }}</p>
+                    <p class="text-sm mt-1">Berdasarkan nilai MAPE (Mean Absolute Percentage Error) terendah.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabel Hasil Evaluasi -->
+        <div class="max-w-5xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden mb-16">
+             <div class="p-6 md:p-8">
+                <h2 class="text-2xl font-bold text-center mb-6">Perbandingan Metrik Evaluasi</h2>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm text-left">
+                        <thead class="bg-gray-800 text-white uppercase tracking-wider">
+                            <tr>
+                                <th scope="col" class="px-6 py-4 rounded-tl-lg">Timeframe</th>
+                                <th scope="col" class="px-6 py-4">MAE</th>
+                                <th scope="col" class="px-6 py-4">MAPE (%)</th>
+                                <th scope="col" class="px-6 py-4">MSE</th>
+                                <th scope="col" class="px-6 py-4 rounded-tr-lg">RMSE</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200">
+                            {% for tf in results %}
+                            <tr class="transition-colors hover:bg-gray-100 {% if tf.timeframe == best_timeframe %}bg-green-50 font-semibold text-green-900{% endif %}">
+                                <td class="px-6 py-4 whitespace-nowrap">{{ tf.timeframe }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ tf.mae }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ tf.mape }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ tf.mse }}</td>
+                                <td class="px-6 py-4 whitespace-nowrap">{{ tf.rmse }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Galeri Grafik Prediksi -->
+        <div class="space-y-16">
+            <h2 class="text-3xl font-bold text-center">Grafik Prediksi vs. Harga Aktual</h2>
+            
+            <!-- Plot Harian -->
+            <div class="bg-white p-4 sm:p-6 rounded-xl shadow-xl">
+                <h3 class="text-xl font-bold mb-4">Harian (Daily)</h3>
+                <img src="data:image/png;base64,{{ plot_daily }}" alt="Grafik Harian" class="w-full h-auto rounded-md">
+            </div>
+
+            <!-- Plot Mingguan -->
+            <div class="bg-white p-4 sm:p-6 rounded-xl shadow-xl">
+                <h3 class="text-xl font-bold mb-4">Mingguan (Weekly)</h3>
+                <img src="data:image/png;base64,{{ plot_weekly }}" alt="Grafik Mingguan" class="w-full h-auto rounded-md">
+            </div>
+
+            <!-- Plot Bulanan -->
+            <div class="bg-white p-4 sm:p-6 rounded-xl shadow-xl">
+                <h3 class="text-xl font-bold mb-4">Bulanan (Monthly)</h3>
+                <img src="data:image/png;base64,{{ plot_monthly }}" alt="Grafik Bulanan" class="w-full h-auto rounded-md">
+            </div>
+        </div>
+
+        <!-- Tombol Kembali -->
+        <div class="text-center mt-16">
+            <a href="{{ url_for('index') }}" class="inline-flex items-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-transform transform hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300">
+                <svg class="w-5 h-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
+                </svg>
+                Analisis Data Lain
+            </a>
+        </div>
+         <footer class="text-center mt-12 text-gray-500 text-sm">
+            <p>Dibuat dengan Flask & TensorFlow</p>
+        </footer>
+    </div>
+
+</body>
+</html>
