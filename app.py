@@ -142,6 +142,17 @@ if 'results' not in st.session_state:
 with st.sidebar:
     
     st.markdown(
+        """
+        <style>
+        /* Target a container of the image within the sidebar to avoid affecting other images */
+        [data-testid="stSidebar"] [data-testid="stImage"] > img {
+            background-color: white;
+            border-radius: 0.75rem; /* Sudut membulat */
+            padding: 0.5rem; /* Sedikit spasi di dalam bingkai */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Bayangan halus */
+        }
+        </style>
+        """,
         unsafe_allow_html=True,
     )
     
