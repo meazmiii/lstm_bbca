@@ -10,7 +10,7 @@ import os
 # Setting the page configuration must be the first Streamlit command.
 st.set_page_config(
     page_title="Analisis Saham BBCA",
-    page_icon="📈",
+    page_icon="�",
     layout="wide"
 )
 
@@ -142,9 +142,15 @@ if 'results' not in st.session_state:
 with st.sidebar:
     st.header("Unggah Data Saham")
     
-    # Using Stonks image from URL
-    st.image("https://i.imgflip.com/3p67w1.png", width=150)
-    
+    # PERBAIKAN: Menggunakan file gambar lokal
+    try:
+        # Membuat path yang benar ke gambar, agar berfungsi baik di lokal maupun saat deploy
+        base_path = os.path.dirname(__file__)
+        image_path = os.path.join(base_path, 'static', 'meme-stonks.jpg')
+        st.image(image_path, width=150)
+    except FileNotFoundError:
+        st.warning("File 'meme-stonks.jpg' tidak ditemukan. Pastikan file tersebut ada di dalam folder 'static'.")
+
     daily_file = st.file_uploader("Data Harian (.csv)", type="csv")
     weekly_file = st.file_uploader("Data Mingguan (.csv)", type="csv")
     monthly_file = st.file_uploader("Data Bulanan (.csv)", type="csv")
@@ -208,14 +214,23 @@ if st.session_state['results']:
         st.subheader("Harian")
         st.metric("MAPE", f"{results['daily']['mape']:.2f}%")
         st.metric("RMSE", f"{results['daily']['rmse']:,.2f}")
+        # PERBAIKAN: Menambahkan MAE dan MSE
+        st.metric("MAE", f"{results['daily']['mae']:,.2f}")
+        st.metric("MSE", f"{results['daily']['mse']:,.2f}")
     with col2:
         st.subheader("Mingguan")
         st.metric("MAPE", f"{results['weekly']['mape']:.2f}%")
         st.metric("RMSE", f"{results['weekly']['rmse']:,.2f}")
+        # PERBAIKAN: Menambahkan MAE dan MSE
+        st.metric("MAE", f"{results['weekly']['mae']:,.2f}")
+        st.metric("MSE", f"{results['weekly']['mse']:,.2f}")
     with col3:
         st.subheader("Bulanan")
         st.metric("MAPE", f"{results['monthly']['mape']:.2f}%")
         st.metric("RMSE", f"{results['monthly']['rmse']:,.2f}")
+        # PERBAIKAN: Menambahkan MAE dan MSE
+        st.metric("MAE", f"{results['monthly']['mae']:,.2f}")
+        st.metric("MSE", f"{results['monthly']['mse']:,.2f}")
     st.markdown("---")
     
     # Display plots in tabs
@@ -230,4 +245,3 @@ if st.session_state['results']:
     with tab3:
         fig_m = create_plot(results['monthly']['true'], results['monthly']['pred'], "Bulanan")
         st.pyplot(fig_m)
-
