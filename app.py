@@ -124,6 +124,30 @@ def create_plot(actual, predicted, title):
 
 # --- STREAMLIT INTERFACE ---
 
+# PERBAIKAN: Menambahkan CSS kustom untuk tema terang (sidebar putih, latar belakang abu-abu)
+st.markdown(
+    """
+    <style>
+    /* Mengatur warna latar belakang utama aplikasi */
+    .main {
+        background-color: #f8f9fa;
+    }
+    /* Mengatur warna latar belakang sidebar menjadi putih */
+    [data-testid="stSidebar"] {
+        background-color: white;
+    }
+    /* Menjaga style untuk gambar meme agar memiliki bingkai putihnya sendiri */
+    [data-testid="stSidebar"] [data-testid="stImage"] > img {
+        background-color: #ffffff;
+        border-radius: 0.75rem;
+        padding: 0.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Main Title and Description
 st.title("📈 Analisis Prediksi Saham BBCA dengan LSTM")
 st.write(
@@ -140,27 +164,14 @@ if 'results' not in st.session_state:
 
 # File Upload Section in the Sidebar
 with st.sidebar:
-    
-    st.markdown(
-        """
-        <style>
-        /* Target a container of the image within the sidebar to avoid affecting other images */
-        [data-testid="stSidebar"] [data-testid="stImage"] > img {
-            background-color: white;
-            border-radius: 0.75rem; /* Sudut membulat */
-            padding: 0.5rem; /* Sedikit spasi di dalam bingkai */
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Bayangan halus */
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.header("Unggah Data Saham")
     
     try:
         # Membuat path yang benar ke gambar, agar berfungsi baik di lokal maupun saat deploy
         base_path = os.path.dirname(__file__)
         image_path = os.path.join(base_path, 'static', 'meme-stonks.jpg')
-        st.image(image_path, width=150)
+        # PERUBAHAN: Menggunakan use_column_width untuk mengisi lebar sidebar
+        st.image(image_path, use_column_width='auto')
     except FileNotFoundError:
         st.warning("File 'meme-stonks.jpg' tidak ditemukan. Pastikan file tersebut ada di dalam folder 'static'.")
 
