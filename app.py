@@ -1,6 +1,4 @@
 import os
-# Menyembunyikan pesan log TensorFlow level INFO dan WARNING
-# Harus diletakkan sebelum import tensorflow
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 from flask import Flask, request, render_template
@@ -19,7 +17,7 @@ matplotlib.use('Agg')
 
 app = Flask(__name__)
 
-# --- MEMUAT MODEL (PASTIKAN PATH FILE BENAR) ---
+
 try:
     # Asumsi model-model ini dilatih dengan 10 fitur
     model_daily = load_model('models/lstm_daily.keras')
@@ -30,14 +28,10 @@ except IOError as e:
     print("Pastikan Anda sudah melatih dan menyimpan model di direktori 'models/'")
     exit()
 
-# --- FUNGSI-FUNGSI PEMBANTU ---
 
 def prepare_data(df):
-    """
-    PERBAIKAN BESAR:
-    Mempersiapkan data dengan 10 fitur, sama seperti saat training.
-    """
-    # 1. Pastikan nama kolom harga benar
+    """ Mempersiapkan data dengan 10 fitur, sama seperti saat training. """
+
     if 'Terakhir' in df.columns:
         price_col = 'Terakhir'
     elif 'Close' in df.columns:
@@ -49,8 +43,17 @@ def prepare_data(df):
     open_col = 'Pembukaan' if 'Pembukaan' in df.columns else 'Open'
     high_col = 'Tertinggi' if 'Tertinggi' in df.columns else 'High'
     low_col = 'Terendah' if 'Terendah' in df.columns else 'Low'
+    
 
-    # 2. Lakukan Feature Engineering yang sama persis seperti saat training
+    numeric_cols = [price_col, open_col, high_col, low_col]
+    for col in numeric_cols:
+        if col in df.columns:
+            # Hapus karakter non-numerik (kecuali titik desimal) dan konversi ke angka
+            # Contoh: '1,200.50' -> '1200.50'
+            df[col] = df[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
+            df[col] = pd.to_numeric(df[col], errors='coerce') # 'coerce' akan mengubah error menjadi NaN
+
+    # Lakukan Feature Engineering yang sama persis seperti saat training
     df['Change_Open_Close'] = df[open_col] - df[price_col]
     df['Change_High_Low'] = df[high_col] - df[low_col]
     df['RollingMean_5'] = df[price_col].rolling(window=5).mean()
@@ -61,11 +64,11 @@ def prepare_data(df):
     df['Return_5'] = df[price_col].pct_change(5)
     df['Return_10'] = df[price_col].pct_change(10)
     
-    # 3. Isi missing values (NaN) yang muncul dari rolling mean/std/return
+    # Isi missing values (NaN) yang muncul dari rolling mean/std/return/coerce
     df.fillna(method='bfill', inplace=True)
     df.fillna(method='ffill', inplace=True) # Tambahan untuk mengisi jika ada NaN di awal
 
-    # 4. Definisikan fitur dan target
+    # Definisikan fitur dan target
     features = [
         'Change_Open_Close', 'Change_High_Low',
         'RollingMean_5', 'RollingStd_5',
@@ -76,7 +79,7 @@ def prepare_data(df):
     features_with_target = [price_col] + features 
     target_col = price_col
 
-    # 5. Scaling dan pembuatan sequence
+    # Scaling dan pembuatan sequence
     data = df[features_with_target].values
     scaler = MinMaxScaler()
     data_scaled = scaler.fit_transform(data)
@@ -147,8 +150,6 @@ def plot_to_base64(actual, predicted, title):
     plt.close()
     return img_base64
 
-# --- ROUTE FLASK ---
-# (Fungsi index() dan sisanya tetap sama, tidak perlu diubah)
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
