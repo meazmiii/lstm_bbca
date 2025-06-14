@@ -10,7 +10,7 @@ import os
 # Setting the page configuration must be the first Streamlit command.
 st.set_page_config(
     page_title="Analisis Saham BBCA",
-    page_icon="📈",
+    page_icon="�",
     layout="wide"
 )
 
@@ -160,11 +160,12 @@ with st.sidebar:
         # Membuat path yang benar ke gambar, agar berfungsi baik di lokal maupun saat deploy
         base_path = os.path.dirname(__file__)
         image_path = os.path.join(base_path, 'static', 'meme-stonks.jpg')
-        st.image(image_path, use_column_width='auto')
+        # PERBAIKAN: Mengganti parameter 'use_column_width' yang sudah usang
+        st.image(image_path, use_container_width=True)
     except FileNotFoundError:
         st.warning("File 'meme-stonks.jpg' tidak ditemukan. Pastikan file tersebut ada di dalam folder 'static'.")
     
-    # PERBAIKAN: Menambahkan kembali header "Unggah Data Saham"
+    # Menambahkan kembali header "Unggah Data Saham"
     st.header("Unggah Data Saham")
     daily_file = st.file_uploader("Data Harian (.csv)", type="csv")
     weekly_file = st.file_uploader("Data Mingguan (.csv)", type="csv")
