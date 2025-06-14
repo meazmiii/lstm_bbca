@@ -1,0 +1,17 @@
+[global]
+install_pre_releases = true
+
+[server]
+enableCORS = true
+enableXsrfProtection = true
+enableWebsocketCompression = true
+port = 8501
+headless = true
+maxUploadSize = 200 # MB
+
+[client]
+showErrorDetails = true
+
+[global]
+runnerType = "script"
+install_pre_releases = true
