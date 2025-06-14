@@ -10,7 +10,7 @@ import os
 # Setting the page configuration must be the first Streamlit command.
 st.set_page_config(
     page_title="Analisis Saham BBCA",
-    page_icon="�",
+    page_icon="📈",
     layout="wide"
 )
 
@@ -142,7 +142,22 @@ if 'results' not in st.session_state:
 with st.sidebar:
     st.header("Unggah Data Saham")
     
-    # PERBAIKAN: Menggunakan file gambar lokal
+    # PERBAIKAN: Menambahkan style CSS agar gambar terlihat bagus di tema gelap/terang
+    st.markdown(
+        """
+        <style>
+        /* Target a container of the image within the sidebar to avoid affecting other images */
+        [data-testid="stSidebar"] [data-testid="stImage"] > img {
+            background-color: white;
+            border-radius: 0.75rem; /* Sudut membulat */
+            padding: 0.5rem; /* Sedikit spasi di dalam bingkai */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); /* Bayangan halus */
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+    
     try:
         # Membuat path yang benar ke gambar, agar berfungsi baik di lokal maupun saat deploy
         base_path = os.path.dirname(__file__)
@@ -214,21 +229,18 @@ if st.session_state['results']:
         st.subheader("Harian")
         st.metric("MAPE", f"{results['daily']['mape']:.2f}%")
         st.metric("RMSE", f"{results['daily']['rmse']:,.2f}")
-        # PERBAIKAN: Menambahkan MAE dan MSE
         st.metric("MAE", f"{results['daily']['mae']:,.2f}")
         st.metric("MSE", f"{results['daily']['mse']:,.2f}")
     with col2:
         st.subheader("Mingguan")
         st.metric("MAPE", f"{results['weekly']['mape']:.2f}%")
         st.metric("RMSE", f"{results['weekly']['rmse']:,.2f}")
-        # PERBAIKAN: Menambahkan MAE dan MSE
         st.metric("MAE", f"{results['weekly']['mae']:,.2f}")
         st.metric("MSE", f"{results['weekly']['mse']:,.2f}")
     with col3:
         st.subheader("Bulanan")
         st.metric("MAPE", f"{results['monthly']['mape']:.2f}%")
         st.metric("RMSE", f"{results['monthly']['rmse']:,.2f}")
-        # PERBAIKAN: Menambahkan MAE dan MSE
         st.metric("MAE", f"{results['monthly']['mae']:,.2f}")
         st.metric("MSE", f"{results['monthly']['mse']:,.2f}")
     st.markdown("---")
