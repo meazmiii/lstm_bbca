@@ -1,260 +1,187 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from tensorflow.keras.models import load_model
-from sklearn.preprocessing import MinMaxScaler
 import matplotlib.pyplot as plt
-import os
+from keras.models import load_model
+from sklearn.preprocessing import MinMaxScaler
+from pandas.tseries.offsets import BDay, DateOffset
 
-# --- PAGE CONFIGURATION ---
-# Setting the page configuration must be the first Streamlit command.
-st.set_page_config(
-    page_title="Analisis Saham BBCA",
-    page_icon="�",
-    layout="wide"
-)
+# =================================================================================
+# Konfigurasi Halaman & Judul
+# =================================================================================
+st.set_page_config(page_title="Analisis Saham BBCA", layout="wide")
+st.title("📈 Dasbor Analisis & Prediksi Saham BBCA")
+st.markdown("Aplikasi ini menggunakan model LSTM untuk menganalisis data historis dalam tiga timeframe.")
 
-# --- HELPER FUNCTIONS (SAME AS FLASK, BUT WITH CACHE DECORATORS) ---
+# =================================================================================
+# CACHING: Fungsi untuk memuat data dan model
+# =================================================================================
 
-# @st.cache_resource decorator is used to load the models only once, saving memory and time.
+# Cache untuk memuat model Keras
 @st.cache_resource
-def load_all_models():
-    """Loads all .keras models from the /models folder."""
-    # Handle path issues in Streamlit Cloud
-    base_path = os.path.dirname(__file__)
-    models_path = os.path.join(base_path, 'models')
-    
+def load_keras_model(timeframe):
+    """Memuat model Keras dari file lokal berdasarkan timeframe."""
+    path = f'models/model_{timeframe}.keras'
     try:
-        model_daily = load_model(os.path.join(models_path, 'lstm_daily.keras'))
-        model_weekly = load_model(os.path.join(models_path, 'lstm_weekly.keras'))
-        model_monthly = load_model(os.path.join(models_path, 'lstm_monthly.keras'))
-        return model_daily, model_weekly, model_monthly
+        model = load_model(path)
+        return model
     except Exception as e:
-        st.error(f"Gagal memuat model: {e}. Pastikan file model ada di dalam folder 'models'.")
-        return None, None, None
+        st.error(f"Error memuat model dari path: {path}. Pastikan file ada. Error: {e}")
+        return None
 
-def prepare_data(df):
-    """Prepares data with 10 features, same as during training."""
-    if 'Terakhir' in df.columns:
-        price_col = 'Terakhir'
-    elif 'Close' in df.columns:
-        price_col = 'Close'
-    else:
-        raise ValueError("File CSV harus memiliki kolom 'Close' atau 'Terakhir'")
-
-    open_col = 'Pembukaan' if 'Pembukaan' in df.columns else 'Open'
-    high_col = 'Tertinggi' if 'Tertinggi' in df.columns else 'High'
-    low_col = 'Terendah' if 'Terendah' in df.columns else 'Low'
-
-    numeric_cols = [price_col, open_col, high_col, low_col]
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = df[col].astype(str).str.replace(r'[^\d.]', '', regex=True)
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    df['Change_Open_Close'] = df[open_col] - df[price_col]
-    df['Change_High_Low'] = df[high_col] - df[low_col]
-    df['RollingMean_5'] = df[price_col].rolling(window=5).mean()
-    df['RollingStd_5'] = df[price_col].rolling(window=5).std()
-    df['RollingMean_10'] = df[price_col].rolling(window=10).mean()
-    df['RollingStd_10'] = df[price_col].rolling(window=10).std()
-    df['Return_1'] = df[price_col].pct_change(1)
-    df['Return_5'] = df[price_col].pct_change(5)
-    df['Return_10'] = df[price_col].pct_change(10)
-
-    df.fillna(method='bfill', inplace=True)
-    df.fillna(method='ffill', inplace=True)
-
-    features = [
-        'Change_Open_Close', 'Change_High_Low', 'RollingMean_5', 'RollingStd_5',
-        'RollingMean_10', 'RollingStd_10', 'Return_1', 'Return_5', 'Return_10'
-    ]
-    features_with_target = [price_col] + features
-    
-    data = df[features_with_target].values
-    scaler = MinMaxScaler()
-    data_scaled = scaler.fit_transform(data)
-
-    X, y = [], []
-    window_size = 60
-    if len(data_scaled) <= window_size:
-        return None, None, None
-
-    for i in range(window_size, len(data_scaled)):
-        X.append(data_scaled[i-window_size:i, :])
-        y.append(data_scaled[i, 0])
-
-    return np.array(X), np.array(y), scaler
-
-def evaluate_model(model, X, y, scaler):
-    """Evaluates the model and returns metrics and prediction values."""
-    if X is None or len(X) == 0:
-        return 0, 0, 0, 0, np.array([]), np.array([])
-    
-    prediction_scaled = model.predict(X)
-    n_features = X.shape[2]
-
-    dummy_pred = np.zeros((len(prediction_scaled), n_features))
-    dummy_pred[:, 0] = prediction_scaled[:, 0]
-    prediction_rescaled = scaler.inverse_transform(dummy_pred)[:, 0]
-
-    dummy_y = np.zeros((len(y), n_features))
-    dummy_y[:, 0] = y
-    y_rescaled = scaler.inverse_transform(dummy_y)[:, 0]
-    
-    mae = np.mean(np.abs(y_rescaled - prediction_rescaled))
-    mape = np.mean(np.abs((y_rescaled - prediction_rescaled) / y_rescaled)) * 100
-    mse = np.mean((y_rescaled - prediction_rescaled)**2)
-    rmse = np.sqrt(mse)
-    
-    return mae, mape, mse, rmse, y_rescaled, prediction_rescaled
-
-def create_plot(actual, predicted, title):
-    """Creates and returns a Matplotlib figure."""
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.plot(actual, label='Harga Aktual', color='blue', alpha=0.7)
-    ax.plot(predicted, label='Harga Prediksi', color='red', linestyle='--')
-    ax.set_title(f'Perbandingan Harga Aktual vs Prediksi ({title})', fontsize=16)
-    ax.set_xlabel('Time Step', fontsize=12)
-    ax.set_ylabel('Harga', fontsize=12)
-    ax.legend()
-    ax.grid(True, linestyle='--', alpha=0.6)
-    plt.tight_layout()
-    return fig
-
-# --- STREAMLIT INTERFACE ---
-
-# CSS kustom untuk memberi bingkai pada gambar meme
-st.markdown(
-    """
-    <style>
-    /* Menjaga style untuk gambar meme agar memiliki bingkai putihnya sendiri */
-    [data-testid="stSidebar"] [data-testid="stImage"] > img {
-        background-color: #ffffff;
-        border-radius: 0.75rem;
-        padding: 0.5rem;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Main Title and Description
-st.title("📈 Analisis Prediksi Saham BBCA dengan LSTM")
-st.write(
-    "Aplikasi ini menggunakan model Long Short-Term Memory (LSTM) untuk memprediksi harga saham BBCA. "
-    "Silakan unggah tiga file data historis (.csv) untuk timeframe Harian, Mingguan, dan Bulanan untuk memulai."
-)
-
-# Load models once and cache them
-model_daily, model_weekly, model_monthly = load_all_models()
-
-# Initialize session state to store results
-if 'results' not in st.session_state:
-    st.session_state['results'] = None
-
-# File Upload Section in the Sidebar
-with st.sidebar:
+# Cache untuk memuat dan memproses data CSV
+@st.cache_data
+def load_and_process_data(timeframe):
+    """Memuat data CSV dari file lokal dan memprosesnya."""
+    path = f'data/data historis BBCA {timeframe}.csv'
     try:
-        # Membuat path yang benar ke gambar, agar berfungsi baik di lokal maupun saat deploy
-        base_path = os.path.dirname(__file__)
-        image_path = os.path.join(base_path, 'static', 'meme-stonks.jpg')
-        # PERBAIKAN: Mengganti parameter 'use_column_width' yang sudah usang
-        st.image(image_path, use_container_width=True)
-    except FileNotFoundError:
-        st.warning("File 'meme-stonks.jpg' tidak ditemukan. Pastikan file tersebut ada di dalam folder 'static'.")
-    
-    # Menambahkan kembali header "Unggah Data Saham"
-    st.header("Unggah Data Saham")
-    daily_file = st.file_uploader("Data Harian (.csv)", type="csv")
-    weekly_file = st.file_uploader("Data Mingguan (.csv)", type="csv")
-    monthly_file = st.file_uploader("Data Bulanan (.csv)", type="csv")
+        df = pd.read_csv(path, decimal=',', thousands='.')
+        df['Tanggal'] = pd.to_datetime(df['Tanggal'], dayfirst=True)
+        df.sort_values('Tanggal', inplace=True)
+        df.set_index('Tanggal', inplace=True)
 
-    analyze_button = st.button("Analisis Sekarang", type="primary", use_container_width=True)
+        # Feature Engineering
+        df['Change_Open_Close'] = df['Pembukaan'] - df['Terakhir']
+        df['Change_High_Low'] = df['Tertinggi'] - df['Terendah']
+        df['RollingMean_5'] = df['Terakhir'].rolling(window=5).mean()
+        df['RollingStd_5'] = df['Terakhir'].rolling(window=5).std()
+        df['RollingMean_10'] = df['Terakhir'].rolling(window=10).mean()
+        df['RollingStd_10'] = df['Terakhir'].rolling(window=10).std()
+        df['Return_1'] = df['Terakhir'].pct_change(1)
+        df['Return_5'] = df['Terakhir'].pct_change(5)
+        df['Return_10'] = df['Terakhir'].pct_change(10)
+        
+        df.fillna(method='bfill', inplace=True)
+        df.fillna(method='ffill', inplace=True)
+        return df
+    except Exception as e:
+        st.error(f"Error memuat data dari path: {path}. Pastikan file CSV ada. Error: {e}")
+        return None
 
-# Logic when the analyze button is pressed
-if analyze_button:
-    if daily_file and weekly_file and monthly_file and model_daily:
-        with st.spinner('Sedang menganalisis data dan membuat prediksi... Ini mungkin memakan waktu beberapa saat.'):
-            try:
-                # Read data
-                daily_df = pd.read_csv(daily_file)
-                weekly_df = pd.read_csv(weekly_file)
-                monthly_df = pd.read_csv(monthly_file)
+# =================================================================================
+# Fungsi Logika Prediksi
+# =================================================================================
 
-                # Process and evaluate each timeframe
-                X_d, y_d, s_d = prepare_data(daily_df)
-                mae_d, mape_d, mse_d, rmse_d, y_true_d, y_pred_d = evaluate_model(model_daily, X_d, y_d, s_d)
+def predict_future(model, df, feature_cols, target_col, scaler, window_size, n_steps):
+    """Fungsi untuk melakukan prediksi masa depan."""
+    last_window_data = df[feature_cols].iloc[-window_size:].values
+    future_predictions = []
 
-                X_w, y_w, s_w = prepare_data(weekly_df)
-                mae_w, mape_w, mse_w, rmse_w, y_true_w, y_pred_w = evaluate_model(model_weekly, X_w, y_w, s_w)
+    for _ in range(n_steps):
+        scaled_window = scaler.transform(last_window_data)
+        X_to_predict = scaled_window.reshape(1, window_size, len(feature_cols))
+        predicted_scaled = model.predict(X_to_predict, verbose=0)[0, 0]
 
-                X_m, y_m, s_m = prepare_data(monthly_df)
-                mae_m, mape_m, mse_m, rmse_m, y_true_m, y_pred_m = evaluate_model(model_monthly, X_m, y_m, s_m)
+        dummy_for_inverse = np.zeros((1, len(feature_cols)))
+        target_idx = feature_cols.index(target_col)
+        dummy_for_inverse[0, target_idx] = predicted_scaled
+        predicted_price = scaler.inverse_transform(dummy_for_inverse)[0, target_idx]
+        future_predictions.append(predicted_price)
 
-                # Determine the best timeframe
-                mape_values = {'Harian': mape_d, 'Mingguan': mape_w, 'Bulanan': mape_m}
-                best_timeframe = min(mape_values, key=mape_values.get) if all(v > 0 for v in mape_values.values()) else "N/A"
+        new_row_features = last_window_data[-1, :].copy()
+        new_row_features[target_idx] = predicted_price
+        last_window_data = np.vstack([last_window_data[1:], new_row_features])
+        
+    return future_predictions
 
-                # Save all results to session state
-                st.session_state['results'] = {
-                    "daily": {"mae": mae_d, "mape": mape_d, "mse": mse_d, "rmse": rmse_d, "true": y_true_d, "pred": y_pred_d},
-                    "weekly": {"mae": mae_w, "mape": mape_w, "mse": mse_w, "rmse": rmse_w, "true": y_true_w, "pred": y_pred_w},
-                    "monthly": {"mae": mae_m, "mape": mape_m, "mse": mse_m, "rmse": rmse_m, "true": y_true_m, "pred": y_pred_m},
-                    "best": best_timeframe
-                }
-                st.success("Analisis selesai!")
+# =================================================================================
+# Sidebar - Panel Kontrol
+# =================================================================================
+st.sidebar.header("⚙️ Panel Kontrol")
 
-            except Exception as e:
-                st.error(f"Terjadi kesalahan saat pemrosesan data: {e}")
-                st.session_state['results'] = None
-    else:
-        st.warning("Harap unggah ketiga file CSV sebelum menekan tombol analisis.")
+timeframe_options = {'Harian': 'daily', 'Mingguan': 'weekly', 'Bulanan': 'monthly'}
+timeframe_selection = st.sidebar.radio(
+    "Pilih Timeframe Analisis:",
+    options=list(timeframe_options.keys()),
+)
+timeframe_code = timeframe_options[timeframe_selection]
 
-# Display results if they exist in the session state
-if st.session_state['results']:
-    results = st.session_state['results']
-    best_timeframe = results['best']
-    
-    st.header("Hasil Evaluasi")
+# Atur parameter berdasarkan timeframe
+if timeframe_code == 'daily':
+    n_future = st.sidebar.slider("Jumlah Hari Prediksi:", 5, 30, 10, key='d')
+    window_size = 60
+elif timeframe_code == 'weekly':
+    n_future = st.sidebar.slider("Jumlah Minggu Prediksi:", 4, 24, 8, key='w')
+    window_size = 20
+else: # monthly
+    n_future = st.sidebar.slider("Jumlah Bulan Prediksi:", 3, 18, 12, key='m')
+    window_size = 12
 
-    # Display the best timeframe
-    st.subheader("Timeframe Prediksi Terbaik")
-    st.metric(label="Timeframe Terbaik (MAPE Terendah)", value=best_timeframe)
-    st.markdown("---")
+run_button = st.sidebar.button("🚀 Jalankan Analisis")
 
-    # Display metrics in columns
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.subheader("Harian")
-        st.metric("MAPE", f"{results['daily']['mape']:.2f}%")
-        st.metric("RMSE", f"{results['daily']['rmse']:,.2f}")
-        st.metric("MAE", f"{results['daily']['mae']:,.2f}")
-        st.metric("MSE", f"{results['daily']['mse']:,.2f}")
-    with col2:
-        st.subheader("Mingguan")
-        st.metric("MAPE", f"{results['weekly']['mape']:.2f}%")
-        st.metric("RMSE", f"{results['weekly']['rmse']:,.2f}")
-        st.metric("MAE", f"{results['weekly']['mae']:,.2f}")
-        st.metric("MSE", f"{results['weekly']['mse']:,.2f}")
-    with col3:
-        st.subheader("Bulanan")
-        st.metric("MAPE", f"{results['monthly']['mape']:.2f}%")
-        st.metric("RMSE", f"{results['monthly']['rmse']:,.2f}")
-        st.metric("MAE", f"{results['monthly']['mae']:,.2f}")
-        st.metric("MSE", f"{results['monthly']['mse']:,.2f}")
-    st.markdown("---")
-    
-    # Display plots in tabs
-    st.header("Grafik Prediksi vs. Aktual")
-    tab1, tab2, tab3 = st.tabs(["Harian", "Mingguan", "Bulanan"])
-    with tab1:
-        fig_d = create_plot(results['daily']['true'], results['daily']['pred'], "Harian")
-        st.pyplot(fig_d)
-    with tab2:
-        fig_w = create_plot(results['weekly']['true'], results['weekly']['pred'], "Mingguan")
-        st.pyplot(fig_w)
-    with tab3:
-        fig_m = create_plot(results['monthly']['true'], results['monthly']['pred'], "Bulanan")
-        st.pyplot(fig_m)
+# =================================================================================
+# Area Utama - Tampilan Hasil
+# =================================================================================
+
+if run_button:
+    with st.spinner(f"Memproses analisis untuk timeframe **{timeframe_selection}**..."):
+        # 1. Muat model dan data
+        model = load_keras_model(timeframe_code)
+        df = load_and_process_data(timeframe_code)
+        
+        if model is not None and df is not None:
+            # 2. Siapkan data untuk model
+            target_col = 'Terakhir'
+            feature_cols = ['Terakhir', 'Change_Open_Close', 'Change_High_Low', 'RollingMean_5', 'RollingStd_5', 'RollingMean_10', 'RollingStd_10', 'Return_1', 'Return_5', 'Return_10']
+            
+            scaler = MinMaxScaler()
+            scaler.fit(df[feature_cols])
+
+            # 3. Lakukan Prediksi
+            future_preds = predict_future(model, df, feature_cols, target_col, scaler, window_size, n_future)
+            
+            # 4. Siapkan data untuk tabel dan ringkasan
+            last_real_date = df.index[-1]
+            if timeframe_code == 'daily':
+                future_dates = pd.to_datetime([last_real_date + BDay(i) for i in range(1, n_future + 1)])
+            elif timeframe_code == 'weekly':
+                future_dates = pd.to_datetime([last_real_date + DateOffset(weeks=i) for i in range(1, n_future + 1)])
+            else: # monthly
+                future_dates = pd.to_datetime([last_real_date + DateOffset(months=i) for i in range(1, n_future + 1)])
+
+            # 5. Buat Ringkasan Utama
+            last_actual_price = df['Terakhir'].iloc[-1]
+            first_predicted_price = future_preds[0]
+            change_pct = (first_predicted_price - last_actual_price) / last_actual_price
+            rekomendasi_utama = "HOLD 😐"
+            if change_pct > 0.005: rekomendasi_utama = "BUY 🟢"
+            elif change_pct < -0.005: rekomendasi_utama = "SELL 🔴"
+
+            st.subheader("Ringkasan Prediksi")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Harga Terakhir (dari CSV)", f"Rp {last_actual_price:,.0f}")
+            col2.metric("Prediksi Berikutnya", f"Rp {first_predicted_price:,.0f}", f"{change_pct:.2%}")
+            col3.metric("Rekomendasi Utama", rekomendasi_utama)
+            st.divider()
+
+            # 6. Buat TABS
+            tab1, tab2 = st.tabs(["📊 Grafik Prediksi", "📋 Tabel Proyeksi"])
+
+            with tab1:
+                st.subheader(f"Grafik Prediksi {n_future} {timeframe_selection} ke Depan")
+                fig, ax = plt.subplots(figsize=(12, 6))
+                ax.plot(df.index[-120:], df['Terakhir'][-120:], label='Harga Historis Aktual', color='dodgerblue')
+                ax.plot(future_dates, future_preds, label=f'Prediksi', color='orange', marker='o', linestyle='--')
+                ax.set_title(f'Prediksi Harga Saham BBCA - {timeframe_selection}')
+                ax.set_xlabel('Tanggal')
+                ax.set_ylabel('Harga (Rp)')
+                ax.legend()
+                ax.grid(True)
+                st.pyplot(fig)
+
+            with tab2:
+                st.subheader("Tabel Detail Proyeksi dan Rekomendasi")
+                prediksi_df = pd.DataFrame({'Tanggal': future_dates, 'Harga Prediksi': future_preds})
+                prediksi_df['Tanggal'] = prediksi_df['Tanggal'].dt.strftime('%d %B %Y')
+                prediksi_df['Harga Prediksi (Rp)'] = prediksi_df['Harga Prediksi'].apply(lambda x: f"{x:,.0f}")
+                
+                rekomendasi_tabel = []
+                current_price = last_actual_price
+                for pred in future_preds:
+                    change = (pred - current_price) / current_price
+                    if change > 0.005: rekomendasi_tabel.append('BUY 🟢')
+                    elif change < -0.005: rekomendasi_tabel.append('SELL 🔴')
+                    else: rekomendasi_tabel.append('HOLD 😐')
+                    current_price = pred
+                prediksi_df['Rekomendasi'] = rekomendasi_tabel
+                st.dataframe(prediksi_df, use_container_width=True)
