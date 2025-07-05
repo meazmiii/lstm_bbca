@@ -194,3 +194,38 @@ if run_button:
                         current_price = pred
                     prediksi_df['Rekomendasi'] = rekomendasi_tabel
                     st.dataframe(prediksi_df, use_container_width=True)
+# =================================================================================
+# BAGIAN BARU: Panel Kesimpulan Analisis Perbandingan
+# =================================================================================
+
+# 1. Simpan metrik final dari hasil evaluasi Anda yang sebenarnya
+final_metrics = {
+    'Harian': {'Akurasi (100-MAPE)': 98.42, 'MAE (Rp)': 151.53},
+    'Mingguan': {'Akurasi (100-MAPE)': 97.03, 'MAE (Rp)': 278.98},
+    'Bulanan': {'Akurasi (100-MAPE)': 90.36, 'MAE (Rp)': 935.22}
+}
+
+# 2. Buat DataFrame untuk perbandingan yang rapi
+metrics_df = pd.DataFrame(final_metrics).T # .T untuk transpose (membalik baris dan kolom)
+metrics_df = metrics_df.sort_values(by='Akurasi (100-MAPE)', ascending=False) # Urutkan dari terbaik
+
+# 3. Cari timeframe terbaik
+best_timeframe = metrics_df.index[0]
+best_accuracy = metrics_df['Akurasi (100-MAPE)'].iloc[0]
+
+# 4. Tampilkan di UI menggunakan st.info atau st.container
+with st.container(border=True):
+    st.subheader("🏆 Kesimpulan Analisis Perbandingan")
+    st.markdown(f"""
+    Berdasarkan hasil evaluasi pada ketiga model, timeframe **{best_timeframe}** menunjukkan performa terbaik
+    dengan tingkat akurasi (berdasarkan 100-MAPE) mencapai **{best_accuracy:.2f}%**.
+    
+    Model dengan timeframe harian memiliki tingkat error prediksi (MAE) yang paling rendah,
+    menjadikannya model yang paling direkomendasikan untuk prediksi jangka pendek.
+    """)
+    st.write("**Tabel Perbandingan Metrik:**")
+    st.dataframe(metrics_df.style.highlight_max(axis=0, color='#0068C9', subset=['Akurasi (100-MAPE)'])
+                             .highlight_min(axis=0, color='#0068C9', subset=['MAE (Rp)'])
+                             .format("{:.2f}"))
+
+st.divider() # Garis pemisah
