@@ -21,7 +21,7 @@ st.markdown("Aplikasi ini menggunakan model LSTM untuk menganalisis data histori
 @st.cache_resource
 def load_keras_model(timeframe):
     """Memuat model Keras dari file lokal berdasarkan timeframe."""
-    path = f'models/model_{timeframe}.keras'
+    path = f'models/lstm_{timeframe}.keras'
     try:
         model = load_model(path)
         return model
@@ -33,7 +33,7 @@ def load_keras_model(timeframe):
 @st.cache_data
 def load_and_process_data(timeframe):
     """Memuat data CSV dari file lokal dan memprosesnya."""
-    path = f'data/data historis BBCA {timeframe}.csv'
+    path = f'data/Data Historis BBCA {timeframe}.csv'
     try:
         df = pd.read_csv(path, decimal=',', thousands='.')
         df['Tanggal'] = pd.to_datetime(df['Tanggal'], dayfirst=True)
