@@ -113,6 +113,7 @@ run_button = st.sidebar.button("🚀 Jalankan Analisis")
 # Area Utama - Tampilan Hasil
 # =================================================================================
 
+
 if run_button:
     with st.spinner(f"Memproses analisis untuk timeframe **{timeframe_selection}**..."):
         # 1. Muat model dan data
@@ -120,16 +121,29 @@ if run_button:
         df = load_and_process_data(timeframe_code)
         
         if model is not None and df is not None:
-            # 2. Siapkan data untuk model
-            target_col = 'Terakhir'
-            feature_cols = ['Terakhir', 'Change_Open_Close', 'Change_High_Low', 'RollingMean_5', 'RollingStd_5', 'RollingMean_10', 'RollingStd_10', 'Return_1', 'Return_5', 'Return_10']
             
-            scaler = MinMaxScaler()
-            scaler.fit(df[feature_cols])
+            # =======================================================
+            # === TAMBAHKAN BLOK PENGECEKAN INI ===
+            # =======================================================
+            if len(df) < window_size:
+                st.error(f"Error: Data tidak cukup untuk prediksi.")
+                st.error(f"Timeframe '{timeframe_selection}' membutuhkan minimal {window_size} baris data, tetapi setelah diproses hanya tersedia {len(df)} baris.")
+                st.info("Silakan periksa file CSV sumber Anda atau pilih timeframe yang berbeda.")
+            
+            # =======================================================
+            # === LANJUTKAN HANYA JIKA DATA CUKUP ===
+            # =======================================================
+            else:
+                # 2. Siapkan data untuk model
+                target_col = 'Terakhir'
+                feature_cols = ['Terakhir', 'Change_Open_Close', 'Change_High_Low', 'RollingMean_5', 'RollingStd_5', 'RollingMean_10', 'RollingStd_10', 'Return_1', 'Return_5', 'Return_10']
+                
+                scaler = MinMaxScaler()
+                scaler.fit(df[feature_cols])
 
-            # 3. Lakukan Prediksi
-            future_preds = predict_future(model, df, feature_cols, target_col, scaler, window_size, n_future)
-            
+                # 3. Lakukan Prediksi
+                future_preds = predict_future(model, df, feature_cols, target_col, scaler, window_size, n_future)
+                
             # 4. Siapkan data untuk tabel dan ringkasan
             last_real_date = df.index[-1]
             if timeframe_code == 'daily':
